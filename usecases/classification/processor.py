@@ -4,14 +4,14 @@ from sklearn.preprocessing import StandardScaler
 from contracts.feature_contract import FeatureContract
 
 
-NUMERIC_FEATURES = ["age", "fare", "sibsp", "parch"]
+NUMERIC_FEATURES = ["Age", "Fare", "SibSp", "Parch"]
 CATEGORICAL_MAP  = {
-    "sex":      {"male": 0, "female": 1},
-    "embarked": {"S": 0, "C": 1, "Q": 2},
-    "pclass":   {1: 0, 2: 1, 3: 2},
+    "Sex":      {"male": 0, "female": 1},
+    "Embarked": {"S": 0, "C": 1, "Q": 2},
+    "Pclass":   {1: 0, 2: 1, 3: 2},
 }
 # Final feature order (must be stable — model input_dim depends on this)
-FEATURE_ORDER = ["pclass", "sex", "age", "sibsp", "parch", "fare", "embarked"]
+FEATURE_ORDER = ["Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Embarked"]
 
 
 class TitanicFeatureProcessor(FeatureContract):
@@ -35,12 +35,12 @@ class TitanicFeatureProcessor(FeatureContract):
 
     def fit(self, df: pd.DataFrame) -> "TitanicFeatureProcessor":
         df = self._clean_df(df)
-        self._age_median  = float(df["age"].median())
-        self._fare_median = float(df["fare"].median())
+        self._age_median  = float(df["Age"].median())
+        self._fare_median = float(df["Fare"].median())
 
         # Fill with computed medians before fitting scaler
-        df["age"]  = df["age"].fillna(self._age_median)
-        df["fare"] = df["fare"].fillna(self._fare_median)
+        df["Age"]  = df["Age"].fillna(self._age_median)
+        df["Fare"] = df["Fare"].fillna(self._fare_median)
 
         numeric_block = df[NUMERIC_FEATURES].astype(float)
         self._scaler.fit(numeric_block)
@@ -49,8 +49,8 @@ class TitanicFeatureProcessor(FeatureContract):
 
     def _clean_df(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
-        df["sex"]      = df["sex"].str.lower().str.strip()
-        df["embarked"] = df["embarked"].str.upper().str.strip().fillna("S")
+        df["Sex"]      = df["Sex"].str.lower().str.strip()
+        df["Embarked"] = df["Embarked"].str.upper().str.strip().fillna("S")
         return df
 
     # ------------------------------------------------------------------
@@ -62,19 +62,19 @@ class TitanicFeatureProcessor(FeatureContract):
         Accepts one raw dict matching InputSchema.
         Returns shape (1, n_features) — ready for model.forward().
         """
-        age      = float(record.get("age")  or self._age_median)
-        fare     = float(record.get("fare") or self._fare_median)
-        sibsp    = int(record.get("sibsp", 0))
-        parch    = int(record.get("parch", 0))
+        age = float(self._age_median if pd.isna(record.get("Age")) else record.get("Age"))
+        fare = float(self._fare_median if pd.isna(record.get("Fare")) else record.get("Fare"))
+        sibsp    = int(record.get("SibSp", 0))
+        parch    = int(record.get("Parch", 0))
 
-        sex      = str(record.get("sex", "male")).lower().strip()
-        embarked = str(record.get("embarked", "S")).upper().strip()
-        pclass   = int(record.get("pclass", 3))
+        sex      = str(record.get("Sex", "male")).lower().strip()
+        embarked = str(record.get("Embarked", "S")).upper().strip()
+        pclass   = int(record.get("Pclass", 3))
 
         # Encode categoricals
-        sex_enc      = CATEGORICAL_MAP["sex"].get(sex, 0)
-        embarked_enc = CATEGORICAL_MAP["embarked"].get(embarked, 0)
-        pclass_enc   = CATEGORICAL_MAP["pclass"].get(pclass, 2)
+        sex_enc      = CATEGORICAL_MAP["Sex"].get(sex, 0)
+        embarked_enc = CATEGORICAL_MAP["Embarked"].get(embarked, 0)
+        pclass_enc   = CATEGORICAL_MAP["Pclass"].get(pclass, 2)
 
         # Scale numerics using fitted scaler
         numeric_block = np.array([[age, fare, sibsp, parch]], dtype=float)

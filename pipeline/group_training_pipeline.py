@@ -6,6 +6,7 @@ from contracts.feature_contract import FeatureContract
 import pandas as pd
 import numpy as np
 
+
 class GroupTrainingPipeline:
     """
     Generic pipeline for any UsecaseGroupContract.
@@ -31,14 +32,18 @@ class GroupTrainingPipeline:
     ) -> str:
         """
         Returns the MLflow model URI of the promoted champion.
+        Ensures processor is fit and bundled with the model artifact.
         """
         mlflow.set_experiment(self.experiment_name)
-        X = processor.fit(raw_df.drop(columns=[target_col]))
-        # transform full frame for train/val split
+        
+        # Fit processor on training data (no target column)
+        processor.fit(raw_df.drop(columns=[target_col]))
+        
+        # Transform full frame for train/val split
         X_arr = np.vstack([processor.transform(row) for row in raw_df.drop(columns=[target_col]).to_dict("records")])
         y_arr = raw_df[target_col].values
 
-        best_score, best_uri, best_run_id = -np.inf, None, None
+        best_score, best_uri, best_run_id, best_model = -np.inf, None, None, None
 
         for model in models:
             with mlflow.start_run(run_name=type(model).__name__) as run:
@@ -51,11 +56,14 @@ class GroupTrainingPipeline:
                 model.build(input_dim=X_arr.shape[1])
                 metrics = model.train(X_arr, y_arr)
                 mlflow.log_metrics(metrics)
-                uri = model.log_to_mlflow(run, artifact_path="model")
+                
+                # CRITICAL: Pass processor to log_to_mlflow so it's bundled
+                uri = model.log_to_mlflow(run, artifact_path="model", processor=processor)
 
                 score = metrics.get(metric_to_maximize, -np.inf)
                 if score > best_score:
                     best_score, best_uri, best_run_id = score, uri, run.info.run_id
+                    best_model = model
 
         # Register + alias best model as champion for this usecase
         model_name = f"{self.group.usecase_name}_models"

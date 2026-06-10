@@ -11,18 +11,18 @@ class TitanicClassificationGroup(UsecaseGroupContract):
     def input_schema(self) -> InputSchema:
         return InputSchema(
             fields={
-                "pclass":    int,
-                "sex":       str,   # "male" | "female"
-                "age":       float,
-                "sibsp":     int,
-                "parch":     int,
-                "fare":      float,
-                "embarked":  str,   # "S" | "C" | "Q"
+                "Pclass":    int,
+                "Sex":       str,   # "male" | "female"
+                "Age":       float,
+                "Sibsp":     int,
+                "Parch":     int,
+                "Fare":      float,
+                "Embarked":  str,   # "S" | "C" | "Q"
             },
             description="One passenger record from the Titanic dataset.",
             example={
-                "pclass": 3, "sex": "male", "age": 22.0,
-                "sibsp": 1, "parch": 0, "fare": 7.25, "embarked": "S",
+                "Pclass": 3, "Sex": "male", "Age": 22.0,
+                "Sibsp": 1, "Parch": 0, "Fare": 7.25, "Embarked": "S",
             },
         )
 

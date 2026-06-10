@@ -22,6 +22,14 @@ class UsecaseAdapter(ABC):
     @abstractmethod
     def output_schema(self) -> OutputSchema: ...
 
+    @property
+    @abstractmethod
+    def target_column(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def training_schema(self) -> dict: ...
+
     @abstractmethod
     def load_champion(self) -> None:
         """Pull champion from MLflow. Called on init and on hot-swap."""

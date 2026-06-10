@@ -19,8 +19,13 @@ class ModelContract(ABC):
         ...
 
     @abstractmethod
-    def log_to_mlflow(self, run: mlflow.ActiveRun, artifact_path: str) -> str:
-        """Logs model + processor bundle. Returns model URI."""
+    def log_to_mlflow(self, run: mlflow.ActiveRun, artifact_path: str, 
+                      processor=None, **kwargs) -> str:
+        """
+        Logs model + processor bundle to MLflow.
+        processor: FeatureContract instance (optional, but should be provided)
+        Returns model URI.
+        """
         ...
 
     @property
