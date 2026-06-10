@@ -1,14 +1,11 @@
-# serving/usecase_adapter.py
 from abc import ABC, abstractmethod
 from contracts.usecase_groups import InputSchema, OutputSchema
+from contracts.feature_contract import FeatureContract
+from contracts.model_contract import ModelContract
 import numpy as np
 
+
 class UsecaseAdapter(ABC):
-    """
-    One adapter instance lives per usecase in the registry.
-    On champion swap, a new adapter is instantiated and replaces the old one.
-    Preprocess + predict + postprocess are the only methods the router calls.
-    """
 
     @property
     @abstractmethod
@@ -24,33 +21,35 @@ class UsecaseAdapter(ABC):
 
     @property
     @abstractmethod
-    def target_column(self) -> str: ...
+    def target_column(self) -> str:
+        """Column name the pipeline uses as label during training."""
+        ...
 
     @property
     @abstractmethod
-    def training_schema(self) -> dict: ...
+    def models(self) -> list[ModelContract]:
+        """All model architectures that compete for this usecase."""
+        ...
 
+    @property
     @abstractmethod
-    def load_champion(self) -> None:
-        """Pull champion from MLflow. Called on init and on hot-swap."""
+    def processor(self) -> FeatureContract:
+        """Fresh (unfitted) processor instance for this usecase."""
         ...
 
     @abstractmethod
-    def preprocess(self, raw_record: dict) -> np.ndarray:
-        """Validate + transform one raw dict into feature array."""
-        ...
+    def load_champion(self) -> None: ...
 
     @abstractmethod
-    def predict(self, features: np.ndarray) -> np.ndarray:
-        ...
+    def preprocess(self, raw_record: dict) -> np.ndarray: ...
 
     @abstractmethod
-    def postprocess(self, raw_output: np.ndarray) -> dict:
-        """Map raw model output → typed response dict matching output_schema."""
-        ...
+    def predict(self, features: np.ndarray) -> np.ndarray: ...
+
+    @abstractmethod
+    def postprocess(self, raw_output: np.ndarray) -> dict: ...
 
     def run(self, raw_record: dict) -> dict:
-        """Full inference pipeline. Called by the router."""
         features = self.preprocess(raw_record)
         raw_out  = self.predict(features)
         return self.postprocess(raw_out)

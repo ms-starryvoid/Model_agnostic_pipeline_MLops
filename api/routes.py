@@ -1,5 +1,6 @@
 # api/routes.py
 from fastapi import APIRouter, HTTPException, File, Form, Request, UploadFile
+from pipeline.group_training_pipeline import GroupTrainingPipeline
 from serving.adapter_registry import UsecaseAdapterRegistry
 import pandas as pd
 import io
@@ -91,77 +92,55 @@ def build_router(registry: UsecaseAdapterRegistry) -> APIRouter:
         csv_file: UploadFile | None = File(None),
         target_col: str | None = Form(None),
     ):
-        """
-        Train + register a champion model for a usecase.
-        Expects CSV training data as multipart file upload or raw CSV body.
-        If target column is omitted, the usecase default target column is used.
-        """
         if usecase not in registry.all_usecases():
             raise HTTPException(404, detail=f"Usecase '{usecase}' not found")
 
         try:
-            adapter = registry.get_unsafe(usecase)
-            if target_col is None:
-                target_col = adapter.target_column
+            # Adapter is the only thing the route knows about
+            adapter    = registry.get_unsafe(usecase)
+            target_col = target_col or adapter.target_column
 
-            if csv_file is not None:
-                contents = await csv_file.read()
-            else:
-                contents = await request.body()
-
+            # --- parse CSV ---
+            contents = await csv_file.read() if csv_file else await request.body()
             if not contents:
                 raise HTTPException(422, detail="No CSV training data received.")
-
             try:
                 df = pd.read_csv(io.BytesIO(contents))
-            except Exception as parse_exc:
-                raise HTTPException(422, detail=f"Could not parse CSV training data: {parse_exc}")
+            except Exception as e:
+                raise HTTPException(422, detail=f"Could not parse CSV: {e}")
 
-            matched_target = _match_column_name(list(df.columns), target_col)
-            if matched_target is None:
+            matched = _match_column_name(list(df.columns), target_col)
+            if matched is None:
                 raise HTTPException(
                     422,
-                    detail=(
-                        f"Target column '{target_col}' not found in CSV. "
-                        f"Available columns: {list(df.columns)}"
-                    ),
+                    detail=f"Target column '{target_col}' not found. "
+                           f"Available: {list(df.columns)}",
                 )
-            target_col = matched_target
 
-            # Import here to avoid circular dependency
-            from usecases.classification.groups import TitanicClassificationGroup
-            from usecases.classification.processor import TitanicFeatureProcessor
-            from usecases.classification.models import ShallowMLPModel
-            from pipeline.group_training_pipeline import GroupTrainingPipeline
-
-            # Hardcoded for now (next step: parameterize by adapter_tag)
-            group = TitanicClassificationGroup()
-            processor = TitanicFeatureProcessor()
-            models = [ShallowMLPModel()]
-
-            pipeline = GroupTrainingPipeline(group)
+            # --- training — group, processor, models all come from the adapter ---
+            pipeline = GroupTrainingPipeline(adapter.group)
             best_uri = pipeline.run(
-                models=models,
-                processor=processor,
+                models=adapter.models,          # all architectures for this usecase
+                processor=adapter.processor,    # fresh unfitted instance
                 raw_df=df,
-                target_col=target_col,
-                metric_to_maximize="loss"  # minimize loss
+                target_col=matched,
+                metric_to_maximize="loss",
             )
 
-            # Reload champion into registry
             registry.hot_swap(usecase)
 
             return {
-                "usecase": usecase,
-                "target_column": target_col,
-                "message": "Training completed successfully",
-                "best_model_uri": best_uri,
+                "usecase":         usecase,
+                "target_column":   matched,
+                "models_trained":  [type(m).__name__ for m in adapter.models],
+                "message":         "Training completed successfully",
+                "best_model_uri":  best_uri,
                 "champion_loaded": registry.is_champion_loaded(usecase),
             }
 
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(500, detail=f"Training failed: {str(e)}")
+            raise HTTPException(500, detail=f"Training failed: {e}")
 
     return router

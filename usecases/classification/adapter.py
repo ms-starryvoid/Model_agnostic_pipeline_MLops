@@ -6,9 +6,14 @@ import joblib
 import mlflow
 import numpy as np
 import torch
+# groups/shallow_mlp/processor.py
+from usecases.classification.processor import TitanicFeatureProcessor as ShallowMLPProcessor
 
+from contracts.feature_contract import FeatureContract
+from contracts.model_contract import ModelContract
 from contracts.usecase_groups import InputSchema, OutputSchema
 from usecases.classification.groups import TitanicClassificationGroup
+from usecases.classification.models import ShallowMLPModel
 from usecases.classification.processor import TitanicFeatureProcessor
 from serving.usecase_adapter import UsecaseAdapter
 
@@ -34,6 +39,14 @@ class TitanicClassificationAdapter(UsecaseAdapter):
     @property
     def target_column(self) -> str:
         return "survived"
+
+    @property
+    def processor(self) -> FeatureContract:
+        return ShallowMLPProcessor()          # fresh unfitted instance every time
+
+    @property
+    def models(self) -> list[ModelContract]:
+        return [ShallowMLPModel()] 
 
     @property
     def training_schema(self) -> dict:

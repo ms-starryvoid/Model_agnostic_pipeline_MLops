@@ -112,7 +112,7 @@ async def train_usecase(usecase: str, csv_file: UploadFile = File(...)):
 # usecases/classification/adapter.py - Robust loading:
 def load_champion(self):
     model_dir = local_dir / "model" if (local_dir / "model").exists() else local_dir
-    
+    print("Loading:", model_name)
     processor_path = model_dir / "processor.joblib"
     if not processor_path.exists():
         raise FileNotFoundError(f"processor.joblib not found at {processor_path}. "
